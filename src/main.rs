@@ -35,7 +35,9 @@ struct MainState {
     cohesion_rule: bool,
     screen_width: f32,
     screen_height: f32,
-    game_paused: bool
+    game_paused: bool,
+    time_until_orient_update: f32,
+    bird_spawn_cooldown: f32
 }
 
 impl MainState {
@@ -44,10 +46,11 @@ impl MainState {
         let screen_width = conf.window_mode.width;
         let screen_height = conf.window_mode.height;
         let assets =  Assets::new(ctx)?;
+        let birds = vec![Bird::new(Point2{x: screen_width / 2.0, y: screen_height / 2.0}, 0 as f32)];
         let s = MainState {
             rng: rand::thread_rng(),
             assets: assets,
-            birds: Vec::new(),
+            birds: birds,
             obstacles: Vec::new(),
             input: InputState::default(),
             separation_rule: true,
@@ -55,28 +58,30 @@ impl MainState {
             cohesion_rule: true,
             screen_width: conf.window_mode.width,
             screen_height: conf.window_mode.height,
-            game_paused: false
+            game_paused: false,
+            time_until_orient_update: 0.1 as f32,
+            bird_spawn_cooldown: 1.0 as f32
         };
 
         Ok(s)
     }
 
-    fn handle_collisions(&mut self, ctx: &mut Context) {
-        for obstacle in &mut self.obstacles {
-            for bird in &mut self.birds {
-                if obstacle.bounding_rect(ctx).contains(bird.pos) {
-                    todo!();
-                }
-            }
-        }
-    }
+    // fn handle_collisions(&mut self, ctx: &mut Context) {
+    //     for obstacle in &mut self.obstacles {
+    //         for bird in &mut self.birds {
+    //             if obstacle.bounding_rect(ctx).contains(bird.pos) {
+    //                 todo!();
+    //             }
+    //         }
+    //     }
+    // }
 
     fn toggle_rule(&mut self, rule: &str) {
         match rule {
             "separation" => self.separation_rule = !self.separation_rule,
             "alignment" => self.separation_rule = !self.alignment_rule,
             "cohesion" => self.separation_rule = !self.cohesion_rule,
-            
+            _ => ()
         }
     }
 }
@@ -93,12 +98,22 @@ impl event::EventHandler for MainState {
         while timer::check_update_time(ctx, DESIRED_FPS) {
             let seconds = 1.0 / (DESIRED_FPS as f32);
             
-            for obstacle in self.obstacles.iter_mut() {
-                obstacle.update(seconds, self.rng);
-            }
+            // for obstacle in self.obstacles.iter_mut() {
+            //     obstacle.update(seconds, self.rng);
+            // }
+            self.bird_spawn_cooldown -= seconds;
+            if mouse::button_pressed(ctx, mouse::MouseButton::Left) && self.bird_spawn_cooldown <= 0.0{
+                let mouse_position = mouse::position(ctx);
 
+                let x = mouse_position.x;
+                let y = mouse_position.y;
+
+                let new_bird = Bird::new(Point2{x: x, y: y}, 0 as f32);
+                self.birds.push(new_bird);
+                self.bird_spawn_cooldown = 1.0;
+            }    
             for bird in self.birds.iter_mut() {
-                bird.update(seconds, self.rng);
+                bird.update(seconds, &mut self.rng);
             }
 
         }
@@ -153,19 +168,19 @@ impl event::EventHandler for MainState {
         //     return Ok(())
         // }
 
-        for obstacle in self.obstacles.iter_mut() {
-            obstacle.draw(ctx)?;
-        }
+        // for obstacle in self.obstacles.iter_mut() {
+        //     obstacle.draw(ctx)?;
+        // }
 
         for bird in self.birds.iter_mut() {
             bird.draw(ctx, &self.assets)?;
         }
 
-        if debug::is_active() {
-            for obstacles in &mut self.obstacles {
-                debug::draw_outline(enemy.bounding_rect(ctx), ctx).unwrap();
-            }
-        }
+        // if debug::is_active() {
+        //     for obstacles in &mut self.obstacles {
+        //         debug::draw_outline(enemy.bounding_rect(ctx), ctx).unwrap();
+        //     }
+        // }
 
         graphics::present(ctx)?;
         Ok(())
@@ -175,11 +190,11 @@ impl event::EventHandler for MainState {
 pub fn main() {
     let conf = Conf::new().
         window_mode(WindowMode {
-            width: 800.0,
-            height: 600.0,
+            width: 1280.0,
+            height: 720.0,
             ..Default::default()
         });
-    let (mut ctx, event_loop) = ContextBuilder::new("boids", "Ivaylogi").default_conf(conf.clone()).build().unwrap();
+    let (mut ctx, mut event_loop) = ContextBuilder::new("boids", "Ivaylogi").conf(conf.clone()).build().unwrap();
 
     // We add the CARGO_MANIFEST_DIR/resources do the filesystems paths so
     // we we look in the cargo project for files.
@@ -189,7 +204,7 @@ pub fn main() {
         filesystem::mount(&mut ctx, &path, true);
     }
 
-    let state = MainState::new(&mut ctx, &conf).unwrap();
+    let mut state = MainState::new(&mut ctx, &conf).unwrap();
 
-    event::run(ctx, event_loop, state);
+    event::run(&mut ctx, &mut event_loop, &mut state);
 }

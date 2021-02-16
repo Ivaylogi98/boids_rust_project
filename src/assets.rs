@@ -10,8 +10,8 @@ pub struct Assets {
 
 impl Assets {
     pub fn new(ctx: &mut Context) -> GameResult<Assets> {
-        let bird = graphics::Image::new(ctx, "./assets/bird.png")?;
-        let obstacle = graphics::Image::new(ctx, "./assets/obstacle.png")?;
+        let bird = graphics::Image::new(ctx, "/bird.png")?;
+        let obstacle = graphics::Image::new(ctx, "/obstacle.png")?;
         Ok(Assets {
             bird,
             obstacle
