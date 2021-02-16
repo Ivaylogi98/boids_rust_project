@@ -18,7 +18,7 @@ pub struct Bird {
 }
 
 impl Bird{
-    pub const SPEED: f32 = 1.5 as f32;
+    pub const SPEED: f32 = 2 as f32;
 
     pub fn new(pos: Point2<f32>, orient: f32) -> Self {
         Bird{
@@ -28,12 +28,24 @@ impl Bird{
         }
     }
 
-    pub fn update(&mut self, orientation_update: f32) {
+    pub fn update(&mut self, orientation_update: f32, screen_width: f32, screen_height: f32) {
         // update position
         let x_offset = self.orient.sin() * Self::SPEED;
         let y_offset = self.orient.cos() * Self::SPEED;
         self.pos.x += x_offset;
         self.pos.y += y_offset;
+        if self.pos.x < 0.0 {
+            self.pos.x += screen_width;
+        }
+        else if self.pos.x > screen_width {
+            self.pos.x -= screen_width;
+        }
+        if self.pos.y < 0.0 {
+            self.pos.y += screen_height;
+        }
+        else if self.pos.y > screen_height {
+            self.pos.y -= screen_height;
+        }
 
         // update orientation
         self.orient += orientation_update;

@@ -132,11 +132,11 @@ impl event::EventHandler for MainState {
             let birds_before_orientation_update = self.birds.clone();
             for i in 0..self.birds.len() {
                 let orientation_offset = if update_birds_orientation {
-                    let rand_offset = self.rng.gen_range(-0.3..0.3);
+                    let rand_offset = self.rng.gen_range(-0.25 .. 0.25);
                     let mut offset_for_alignment_rule = 0.0;
                     let mut number_of_local_birds = 0;
                     for j in 0..self.birds.len() {
-                        if i != j && (self.dist(&self.birds[i], &birds_before_orientation_update[j]) <= MainState::VIEW_DISTANCE) {
+                        if self.dist(&self.birds[i], &birds_before_orientation_update[j]) <= MainState::VIEW_DISTANCE {
                             offset_for_alignment_rule += self.birds[j].orient;
                             number_of_local_birds += 1;
                         }
@@ -154,7 +154,7 @@ impl event::EventHandler for MainState {
                    self.birds[i].pos.y < 0.0 || self.birds[i].pos.y >= self.screen_height{
                        self.birds[i].is_alive = false;
                    }
-                self.birds[i].update(orientation_offset);
+                self.birds[i].update(orientation_offset, self.screen_width, self.screen_height);
             }
             // reference borrowing workaround
             let screen_width = self.screen_width;
