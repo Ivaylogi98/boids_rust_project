@@ -14,6 +14,7 @@ use rand::rngs::ThreadRng;
 use boids::entities::Bird;
 use boids::entities::Obstacle;
 use boids::assets::Assets;
+use boids::debug;
 
 use std::env;
 use std::path;
@@ -41,6 +42,8 @@ struct MainState {
 }
 
 impl MainState {
+    pub const VIEW_DISTANCE: f32 = 200 as f32;
+    pub const ALIGNMENT_SPEED: f32 = 0.1 as f32;
 
     fn new(ctx: &mut Context, conf: &Conf) -> GameResult<MainState> {
         let screen_width = conf.window_mode.width;
@@ -60,7 +63,7 @@ impl MainState {
             screen_height: conf.window_mode.height,
             game_paused: false,
             time_until_orient_update: 0.1 as f32,
-            bird_spawn_cooldown: 1.0 as f32
+            bird_spawn_cooldown: 0.5 as f32
         };
 
         Ok(s)
@@ -84,6 +87,10 @@ impl MainState {
             _ => ()
         }
     }
+
+    fn dist(&self, b1: &Bird, b2: &Bird) -> f32 {
+        ((b1.pos.x - b2.pos.x).powf(2.0) + (b1.pos.y - b2.pos.y).powf(2.0)).sqrt()
+    }
 }
 
 
@@ -102,7 +109,7 @@ impl event::EventHandler for MainState {
             //     obstacle.update(seconds, self.rng);
             // }
             self.bird_spawn_cooldown -= seconds;
-            if mouse::button_pressed(ctx, mouse::MouseButton::Left) && self.bird_spawn_cooldown <= 0.0{
+            if mouse::button_pressed(ctx, mouse::MouseButton::Left) && self.bird_spawn_cooldown <= 0.0 {
                 let mouse_position = mouse::position(ctx);
 
                 let x = mouse_position.x;
@@ -110,11 +117,50 @@ impl event::EventHandler for MainState {
 
                 let new_bird = Bird::new(Point2{x: x, y: y}, 0 as f32);
                 self.birds.push(new_bird);
-                self.bird_spawn_cooldown = 1.0;
-            }    
-            for bird in self.birds.iter_mut() {
-                bird.update(seconds, &mut self.rng);
+                self.bird_spawn_cooldown = 0.5;
             }
+
+            self.time_until_orient_update -= seconds;
+            let mut update_birds_orientation = false;
+            
+            if self.time_until_orient_update <= 0 as f32 {
+                self.time_until_orient_update = 0.1 as f32;
+                update_birds_orientation = true;
+            }
+            // println!("Birds left: {}", self.birds.len());
+            // println!("Birds: {:?}", self.birds);
+            let birds_before_orientation_update = self.birds.clone();
+            for i in 0..self.birds.len() {
+                let orientation_offset = if update_birds_orientation {
+                    let rand_offset = self.rng.gen_range(-0.3..0.3);
+                    let mut offset_for_alignment_rule = 0.0;
+                    let mut number_of_local_birds = 0;
+                    for j in 0..self.birds.len() {
+                        if i != j && (self.dist(&self.birds[i], &birds_before_orientation_update[j]) <= MainState::VIEW_DISTANCE) {
+                            offset_for_alignment_rule += self.birds[j].orient;
+                            number_of_local_birds += 1;
+                        }
+                    }
+                    if number_of_local_birds > 0 {
+                        offset_for_alignment_rule /= number_of_local_birds as f32;
+                    }
+                    rand_offset + (self.birds[i].orient - offset_for_alignment_rule) * MainState::ALIGNMENT_SPEED
+                } else {
+                    0.0
+                };
+
+                //set birds that are out of the screen as not alive
+                if self.birds[i].pos.x < 0.0 || self.birds[i].pos.x >= self.screen_width || 
+                   self.birds[i].pos.y < 0.0 || self.birds[i].pos.y >= self.screen_height{
+                       self.birds[i].is_alive = false;
+                   }
+                self.birds[i].update(orientation_offset);
+            }
+            // reference borrowing workaround
+            let screen_width = self.screen_width;
+            let screen_height = self.screen_height;
+            // remove birds that are not alive
+            self.birds.retain(|bird| bird.is_alive && bird.pos.x >= 0.0 && bird.pos.x <= screen_width && bird.pos.y >= 0.0 && bird.pos.y <= screen_height);
 
         }
 
@@ -130,6 +176,11 @@ impl event::EventHandler for MainState {
             event::KeyCode::Q => self.toggle_rule("separation"),
             event::KeyCode::W => self.toggle_rule("alignment"),
             event::KeyCode::E => self.toggle_rule("cohesion"),
+            event::KeyCode::R => {
+                for bird in self.birds.iter_mut() {
+                    bird.is_alive = false;
+                }
+            },
             event::KeyCode::Escape => event::quit(ctx),
             _ => (), // Do nothing
         }
@@ -175,7 +226,11 @@ impl event::EventHandler for MainState {
         for bird in self.birds.iter_mut() {
             bird.draw(ctx, &self.assets)?;
         }
-
+        if debug::is_active() {
+            for bird in &mut self.birds {
+                debug::draw_debug_info(bird.view_distance_circle(ctx, MainState::VIEW_DISTANCE), bird.center_point(ctx), ctx).unwrap();
+            }
+        }
         // if debug::is_active() {
         //     for obstacles in &mut self.obstacles {
         //         debug::draw_outline(enemy.bounding_rect(ctx), ctx).unwrap();

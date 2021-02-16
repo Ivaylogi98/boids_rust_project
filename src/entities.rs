@@ -10,26 +10,25 @@ use rand::rngs::ThreadRng;
 use crate::assets::Assets;
 
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Bird {
     pub pos: Point2<f32>,
     pub orient: f32,
-    time_until_orient_update: f32
+    pub is_alive: bool
 }
 
 impl Bird{
     pub const SPEED: f32 = 1.5 as f32;
-    pub const VIEW_DISTANCE: f32 = 500 as f32;
 
     pub fn new(pos: Point2<f32>, orient: f32) -> Self {
         Bird{
             pos: pos,
             orient: orient,
-            time_until_orient_update: 0.1
+            is_alive: true
         }
     }
 
-    pub fn update(&mut self, seconds: f32, rng: &mut ThreadRng) {
+    pub fn update(&mut self, orientation_update: f32) {
         // update position
         let x_offset = self.orient.sin() * Self::SPEED;
         let y_offset = self.orient.cos() * Self::SPEED;
@@ -37,14 +36,13 @@ impl Bird{
         self.pos.y += y_offset;
 
         // update orientation
-        self.time_until_orient_update -= seconds;
-        let mut orientation_rand_offset = 0 as f32;
-        if self.time_until_orient_update <= 0 as f32 {
-            self.time_until_orient_update = 0.1 as f32;
-            orientation_rand_offset = rng.gen_range(-0.261799..0.261799);
+        self.orient += orientation_update;
+        if self.orient <= 0.0 {
+            self.orient += 6.283;
         }
-        
-        self.orient += orientation_rand_offset;
+        else if self.orient >= 6.283 {
+            self.orient -= 6.283;
+        }
     }
 
     pub fn draw(&mut self, ctx: &mut Context, assets: &Assets) -> GameResult<()> {
@@ -55,14 +53,17 @@ impl Bird{
             rotation: -self.orient + 3.1415,
             .. Default::default()
         })?;
-        let mesh  = MeshBuilder::new().circle(graphics::DrawMode::fill(), Point2{x: 0.0, y: 0.0}, 4.0, 1.0, (255, 0, 0).into()).build(ctx)?;
-        graphics::draw(ctx, &mesh, graphics::DrawParam {
-            dest: self.pos,
-            .. Default::default()
-        })?;
         Ok(())
     }
+
+    pub fn view_distance_circle(&self, ctx: &mut Context, view_distance: f32) -> graphics::Mesh {
+        MeshBuilder::new().circle(graphics::DrawMode::stroke(1.0), Point2{x: self.pos.x, y: self.pos.y}, view_distance, 1.0, (255, 0, 0).into()).build(ctx).unwrap()
+    }
+    pub fn center_point(&self, ctx: &mut Context) -> graphics::Mesh {
+        MeshBuilder::new().circle(graphics::DrawMode::fill(), Point2{x: self.pos.x, y: self.pos.y}, 4.0, 1.0, (255, 0, 0).into()).build(ctx).unwrap()
+    }
 }
+
 #[derive(Debug)]
 pub struct Obstacle {
     pub pos: Point2<f32>,
