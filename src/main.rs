@@ -52,10 +52,11 @@ struct MainState {
 }
 
 impl MainState {
-    pub const ALIGNMENT_VIEW_DISTANCE: f32 = 100_f32;
-    pub const SEPARATION_DISTANCE: f32 = 30_f32;
+    pub const ALIGNMENT_VIEW_DISTANCE: f32 = 80_f32;
+    pub const SEPARATION_VIEW_DISTANCE: f32 = 25_f32;
+    pub const COHESION_DISTANCE: f32 = 80_f32;
     pub const MAX_SPEED: f32 = 2_f32;
-    pub const MAX_STEERING_VELOCITY: f32 = 0.1_f32;
+    pub const MAX_STEERING_VELOCITY: f32 = 0.5_f32;
 
     pub const ALIGNMENT_MODIFIER: Vector2<f32> = Vector2{ x: 1.0, y: 1.0 };
     pub const SEPARATION_MODIFIER: Vector2<f32> = Vector2{ x: 1.0, y: 1.0 };
@@ -79,7 +80,7 @@ impl MainState {
             screen_height: conf.window_mode.height,
             game_paused: false,
             time_until_orient_update: 0.1 as f32,
-            bird_spawn_cooldown: 0.5 as f32,
+            bird_spawn_cooldown: 0.1 as f32,
             pause: Pause::Running
         };
 
@@ -149,14 +150,14 @@ impl event::EventHandler for MainState {
 
                     let new_bird = Bird::new(Point2{ x: x, y: y}, Vector2{ x: self.rng.gen_range(-0.1 .. 0.1), y: self.rng.gen_range(-0.1 .. 0.1) });
                     self.birds.push(new_bird);
-                    self.bird_spawn_cooldown = 0.5;
+                    self.bird_spawn_cooldown = 0.1;
                 }
                 // println!("{} - {:?}", self.birds.len(), self.birds);
                 for i in 0..self.birds.len() {
 
                     let mut acceleration = Vector2{ x: 0.0, y: 0.0 };
 
-                    // ALIGNMENT RULE:
+                    // --------------------------------ALIGNMENT RULE:----------------------------------
                     let mut velocity_sum_of_neigbours = Vector2{ x: 0.0, y: 0.0 };
                     let mut number_of_neighbours = 0;
 
@@ -171,13 +172,15 @@ impl event::EventHandler for MainState {
                     if number_of_neighbours > 0 {
                         Tools::vec_scalar_op(&mut velocity_sum_of_neigbours, number_of_neighbours as f32, |a, b| a / b);
                     }
-                    Tools::vec_op(&mut acceleration, &velocity_sum_of_neigbours, |a, b| a + b);
+                    if self.alignment_rule {
+                        Tools::vec_op(&mut acceleration, &velocity_sum_of_neigbours, |a, b| a + b);
+                    }
 
-                    // SEPARATION RULE:
+                    // --------------------------------SEPARATION RULE:-------------------------------
                     let mut steer_away_velocity = Vector2{x: 0.0, y: 0.0};
                     for j in 0..self.birds.len() {
                         let distance = Tools::distance(&self.birds[i], &self.birds[j]);
-                        if distance > 0.0 && distance <= MainState::SEPARATION_DISTANCE {
+                        if distance > 0.0 && distance <= MainState::SEPARATION_VIEW_DISTANCE {
                             let mut vector_away_from_neightbour = Tools::get_vec_from_to(self.birds[i].pos, self.birds[j].pos);
                             Tools::normalize_vector(&mut vector_away_from_neightbour);
                             Tools::vec_scalar_op(&mut vector_away_from_neightbour, distance, |a,b| a / b);
@@ -194,28 +197,32 @@ impl event::EventHandler for MainState {
                         Tools::vec_op(&mut steer_away_velocity, &self.birds[i].vel, |a, b| a - b);
                         Tools::limit_velocity(&mut steer_away_velocity, MainState::MAX_STEERING_VELOCITY);
                     }
-                    Tools::vec_op(&mut acceleration, &steer_away_velocity, |a, b| a + b);
+                    if self.separation_rule {
+                        Tools::vec_op(&mut acceleration, &steer_away_velocity, |a, b| a + b);
+                    }
 
-                    // COHESION RULE:
+                    // --------------------------------COHESION RULE:------------------------------------
                     let mut average_position = Point2{ x: 0.0, y: 0.0 };
-                    let mut number_of_neighbours= 0;
+                    let mut steer_towards_velocity = Vector2{ x: 0.0, y: 0.0 };
+                    let mut number_of_neighbours = 0;
                     for j in 0..self.birds.len() {
                         let distance = Tools::distance(&self.birds[i], &self.birds[j]);
-                        if distance > 0.0 && distance <= MainState::ALIGNMENT_VIEW_DISTANCE {
+                        if distance > 0.0 && distance <= MainState::COHESION_DISTANCE {
                             Tools::point_op(&mut average_position, &self.birds[j].pos, |a, b| a + b);
                             number_of_neighbours += 1;
                         }
                     }
                     if number_of_neighbours > 0 {
                         Tools::point_scalar_op(&mut average_position, number_of_neighbours as f32, |a,b| a / b);
+                        steer_towards_velocity = Tools::get_vec_from_to(self.birds[i].pos, average_position);
+                        Tools::normalize_vector(&mut steer_towards_velocity);
+                        Tools::vec_scalar_op(&mut steer_towards_velocity, MainState::MAX_SPEED, |a, b| a * b);
+                        Tools::vec_op(&mut steer_towards_velocity, &self.birds[i].vel, |a, b| a - b);
+                        Tools::limit_velocity(&mut steer_towards_velocity, MainState::MAX_STEERING_VELOCITY);
                     }
-                    let mut steer_towards_velocity = Tools::get_vec_from_to(self.birds[i].pos, average_position);
-                    Tools::normalize_vector(&mut steer_towards_velocity);
-                    Tools::vec_scalar_op(&mut steer_towards_velocity, MainState::MAX_SPEED, |a, b| a * b);
-                    Tools::vec_op(&mut steer_towards_velocity, &self.birds[i].vel, |a, b| a - b);
-                    Tools::limit_velocity(&mut steer_towards_velocity, MainState::MAX_STEERING_VELOCITY);
-                    
-                    Tools::vec_op(&mut acceleration, &steer_towards_velocity, |a, b| a + b);
+                    if self.cohesion_rule {
+                        Tools::vec_op(&mut acceleration, &steer_towards_velocity, |a, b| a + b);
+                    }
 
                     // println!("alignment: {:?}", velocity_sum_of_neigbours);
                     // println!("separation: {:?}", steer_away_velocity);
@@ -224,6 +231,7 @@ impl event::EventHandler for MainState {
                     //    self.birds[i].pos.y < 0.0 || self.birds[i].pos.y >= self.screen_height{
                     //        self.birds[i].is_alive = false;
                     //    }
+                    // println!("{}:\nAlignment: {:?}\nSeparation: {:?}\nCohesion: {:?}", i, velocity_sum_of_neigbours, steer_away_velocity, steer_towards_velocity);
                     self.birds[i].update(acceleration, MainState::MAX_SPEED, self.screen_width, self.screen_height);
                 }
                 // remove birds that are not alive
@@ -236,15 +244,11 @@ impl event::EventHandler for MainState {
         Ok(())
     }
 
-    fn key_down_event(&mut self,
-                      ctx: &mut Context,
-                      keycode: event::KeyCode,
-                      _keymod: input::keyboard::KeyMods,
-                      _repeat: bool) {
+    fn key_down_event(&mut self, ctx: &mut Context, keycode: event::KeyCode, _keymod: input::keyboard::KeyMods, _repeat: bool) {
         match keycode {
-            event::KeyCode::Q => self.toggle_rule("separation"),
-            event::KeyCode::W => self.toggle_rule("alignment"),
-            event::KeyCode::E => self.toggle_rule("cohesion"),
+            event::KeyCode::S => self.toggle_rule("separation"),
+            event::KeyCode::A => self.toggle_rule("alignment"),
+            event::KeyCode::C => self.toggle_rule("cohesion"),
             event::KeyCode::R => {
                 for bird in self.birds.iter_mut() {
                     bird.is_alive = false;
@@ -256,18 +260,6 @@ impl event::EventHandler for MainState {
         }
     }
 
-    fn key_up_event(&mut self,
-                    _ctx: &mut Context,
-                    keycode: event::KeyCode,
-                    _keymod: input::keyboard::KeyMods) {
-        match keycode {
-            event::KeyCode::Space => self.input.fire = false,
-            event::KeyCode::Left | event::KeyCode::Right => self.input.movement = 0.0,
-            _ => (), // Do nothing
-        }
-    }
-
-
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
         let dark_blue = graphics::Color::from_rgb(26, 51, 77);
         if self.pause == Pause::Running {
@@ -277,7 +269,11 @@ impl event::EventHandler for MainState {
             }
             if debug::is_active() {
                 for bird in &mut self.birds {
-                    debug::draw_debug_info(bird.alignment_view_distance_circle(ctx, MainState::ALIGNMENT_VIEW_DISTANCE), bird.center_point(ctx), ctx).unwrap();
+                    debug::draw_debug_info(
+                        bird.alignment_view_distance_circle(ctx, MainState::ALIGNMENT_VIEW_DISTANCE),
+                        bird.separation_view_distance_circle(ctx, MainState::SEPARATION_VIEW_DISTANCE),
+                        bird.center_point(ctx), ctx).
+                    unwrap();
                 }
             }
             graphics::present(ctx)?;
