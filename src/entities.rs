@@ -18,7 +18,7 @@ pub struct Bird {
 }
 
 impl Bird{
-    pub const MAX_VELOCITY: f32 = 2 as f32;
+    pub const MAX_VELOCITY: f32 = 3 as f32;
 
     pub fn new(pos: Point2<f32>, vel: Vector2<f32>) -> Self {
         Bird{
@@ -56,7 +56,7 @@ impl Bird{
                                 .dest(self.pos)
                                 .scale(Vector2{ x: 0.1, y: 0.1 })
                                 .offset(Point2{ x: 0.47, y: 0.7 })
-                                .rotation(-(self.vel.y / self.vel.x).atan() + 3.1415);
+                                .rotation((self.vel.y).atan2(self.vel.x) + 3.1415/2.0);
         graphics::draw(ctx, &assets.bird, drawparams)
     }
 

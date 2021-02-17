@@ -126,7 +126,7 @@ impl event::EventHandler for MainState {
                 let x = mouse_position.x;
                 let y = mouse_position.y;
 
-                let new_bird = Bird::new(Point2{ x: x, y: y}, Vector2{ x: -0.1, y: -0.1 });
+                let new_bird = Bird::new(Point2{ x: x, y: y}, Vector2{ x: self.rng.gen_range(-0.1 .. 0.1), y: self.rng.gen_range(-0.1 .. 0.1) });
                 self.birds.push(new_bird);
                 self.bird_spawn_cooldown = 0.5;
             }
