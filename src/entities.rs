@@ -13,27 +13,30 @@ use crate::assets::Assets;
 #[derive(Debug, Copy, Clone)]
 pub struct Bird {
     pub pos: Point2<f32>,
-    pub orient: f32,
+    pub vel: Vector2<f32>,
     pub is_alive: bool
 }
 
 impl Bird{
-    pub const SPEED: f32 = 2 as f32;
+    pub const MAX_VELOCITY: f32 = 2 as f32;
 
-    pub fn new(pos: Point2<f32>, orient: f32) -> Self {
+    pub fn new(pos: Point2<f32>, vel: Vector2<f32>) -> Self {
         Bird{
             pos: pos,
-            orient: orient,
+            vel: vel,
             is_alive: true
         }
     }
 
-    pub fn update(&mut self, orientation_update: f32, screen_width: f32, screen_height: f32) {
+    pub fn update(&mut self, acceleration: Vector2<f32>, screen_width: f32, screen_height: f32) {
+        // update velocity
+        self.vel.x += acceleration.x;
+        self.vel.y += acceleration.y;
+        self.limit_velocity(Bird::MAX_VELOCITY);
+
         // update position
-        let x_offset = self.orient.sin() * Self::SPEED;
-        let y_offset = self.orient.cos() * Self::SPEED;
-        self.pos.x += x_offset;
-        self.pos.y += y_offset;
+        self.pos.x += self.vel.x;
+        self.pos.y += self.vel.y;
         if self.pos.x < 0.0 {
             self.pos.x += screen_width;
         }
@@ -46,26 +49,23 @@ impl Bird{
         else if self.pos.y > screen_height {
             self.pos.y -= screen_height;
         }
-
-        // update orientation
-        self.orient += orientation_update;
-        if self.orient <= 0.0 {
-            self.orient += 6.283;
-        }
-        else if self.orient >= 6.283 {
-            self.orient -= 6.283;
-        }
     }
 
     pub fn draw(&mut self, ctx: &mut Context, assets: &Assets) -> GameResult<()> {
-        graphics::draw(ctx, &assets.bird, graphics::DrawParam {
-            dest: self.pos,
-            scale: Vector2 { x: 0.1, y: 0.1 },
-            offset: Point2 { x: 0.47, y: 0.7 },
-            rotation: -self.orient + 3.1415,
-            .. Default::default()
-        })?;
-        Ok(())
+        let drawparams = graphics::DrawParam::new()
+                                .dest(self.pos)
+                                .scale(Vector2{ x: 0.1, y: 0.1 })
+                                .offset(Point2{ x: 0.47, y: 0.7 })
+                                .rotation(-(self.vel.y / self.vel.x).atan() + 3.1415);
+        graphics::draw(ctx, &assets.bird, drawparams)
+    }
+
+    fn limit_velocity(&mut self, max: f32) {
+        let speed = (self.vel.x.powf(2.0) + self.vel.y.powf(2.0)).sqrt();
+        if speed > max {
+            self.vel.x *= max / speed;
+            self.vel.y *= max / speed;
+        }
     }
 
     pub fn view_distance_circle(&self, ctx: &mut Context, view_distance: f32) -> graphics::Mesh {
