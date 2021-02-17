@@ -8,6 +8,7 @@ use rand::Rng;
 use rand::rngs::ThreadRng;
 
 use crate::assets::Assets;
+use crate::tools::Tools;
 
 
 #[derive(Debug, Copy, Clone)]
@@ -18,7 +19,6 @@ pub struct Bird {
 }
 
 impl Bird{
-    pub const MAX_VELOCITY: f32 = 3 as f32;
 
     pub fn new(pos: Point2<f32>, vel: Vector2<f32>) -> Self {
         Bird{
@@ -28,11 +28,11 @@ impl Bird{
         }
     }
 
-    pub fn update(&mut self, acceleration: Vector2<f32>, screen_width: f32, screen_height: f32) {
+    pub fn update(&mut self, acceleration: Vector2<f32>, max_velocity: f32, screen_width: f32, screen_height: f32) {
         // update velocity
         self.vel.x += acceleration.x;
         self.vel.y += acceleration.y;
-        self.limit_velocity(Bird::MAX_VELOCITY);
+        Tools::limit_velocity(&mut self.vel, max_velocity);
 
         // update position
         self.pos.x += self.vel.x;
@@ -60,16 +60,9 @@ impl Bird{
         graphics::draw(ctx, &assets.bird, drawparams)
     }
 
-    fn limit_velocity(&mut self, max: f32) {
-        let speed = (self.vel.x.powf(2.0) + self.vel.y.powf(2.0)).sqrt();
-        if speed > max {
-            self.vel.x *= max / speed;
-            self.vel.y *= max / speed;
-        }
-    }
 
-    pub fn view_distance_circle(&self, ctx: &mut Context, view_distance: f32) -> graphics::Mesh {
-        MeshBuilder::new().circle(graphics::DrawMode::stroke(1.0), Point2{x: self.pos.x, y: self.pos.y}, view_distance, 1.0, (255, 0, 0).into()).build(ctx).unwrap()
+    pub fn alignment_view_distance_circle(&self, ctx: &mut Context, alignment_view_distance: f32) -> graphics::Mesh {
+        MeshBuilder::new().circle(graphics::DrawMode::stroke(1.0), Point2{x: self.pos.x, y: self.pos.y}, alignment_view_distance, 1.0, (255, 0, 0).into()).build(ctx).unwrap()
     }
     pub fn center_point(&self, ctx: &mut Context) -> graphics::Mesh {
         MeshBuilder::new().circle(graphics::DrawMode::fill(), Point2{x: self.pos.x, y: self.pos.y}, 4.0, 1.0, (255, 0, 0).into()).build(ctx).unwrap()

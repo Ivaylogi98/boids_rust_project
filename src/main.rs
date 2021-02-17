@@ -15,6 +15,7 @@ use boids::entities::Bird;
 use boids::entities::Obstacle;
 use boids::assets::Assets;
 use boids::debug;
+use boids::tools::Tools;
 
 use std::env;
 use std::path;
@@ -42,7 +43,11 @@ struct MainState {
 }
 
 impl MainState {
-    pub const VIEW_DISTANCE: f32 = 200 as f32;
+    pub const ALIGNMENT_VIEW_DISTANCE: f32 = 100_f32;
+    pub const SEPARATION_DISTANCE: f32 = 50_f32;
+    pub const MAX_SPEED: f32 = 2_f32;
+    pub const MAX_STEERING_VELOCITY: f32 = 0.1_f32;
+
     pub const ALIGNMENT_MODIFIER: Vector2<f32> = Vector2{ x: 1.0, y: 1.0 };
     pub const SEPARATION_MODIFIER: Vector2<f32> = Vector2{ x: 1.0, y: 1.0 };
     pub const COHESION_MODIFIER: Vector2<f32> = Vector2{ x: 1.0, y: 1.0 };
@@ -89,18 +94,8 @@ impl MainState {
             _ => ()
         }
     }
-
-
-
 }
-fn normalize_vector( vec: &mut Vector2<f32> ) {
-    let length = (vec.x.powf(2.0) + vec.y.powf(2.0)).sqrt();
-    vec.x /= length;
-    vec.y /= length;
-}
-fn distance(b1: &Bird, b2: &Bird) -> f32 {
-    ((b1.pos.x - b2.pos.x).powf(2.0) + (b1.pos.y - b2.pos.y).powf(2.0)).sqrt()
-}
+
 
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
@@ -130,7 +125,7 @@ impl event::EventHandler for MainState {
                 self.birds.push(new_bird);
                 self.bird_spawn_cooldown = 0.5;
             }
-
+            // println!("{} - {:?}", self.birds.len(), self.birds);
             for i in 0..self.birds.len() {
 
                 // ALIGNMENT RULE:
@@ -138,26 +133,69 @@ impl event::EventHandler for MainState {
                 let mut number_of_neighbours = 0;
 
                 for j in 0..self.birds.len() {
-                    if distance(&self.birds[i], &self.birds[j]) <= MainState::VIEW_DISTANCE {
-                        velocity_sum_of_neigbours.x += self.birds[j].vel.x;
-                        velocity_sum_of_neigbours.y += self.birds[j].vel.y;
+                    let distance = Tools::distance(&self.birds[i], &self.birds[j]);
+                    if distance > 0.0 && distance <= MainState::ALIGNMENT_VIEW_DISTANCE {
+                        Tools::vec_op(&mut velocity_sum_of_neigbours, &self.birds[j].vel, |a,b| a + b);
                         number_of_neighbours += 1;
                     }
                 }
 
                 if number_of_neighbours > 0 {
-                    velocity_sum_of_neigbours.x /= number_of_neighbours as f32;
-                    velocity_sum_of_neigbours.y /= number_of_neighbours as f32;
+                    Tools::vec_scalar_op(&mut velocity_sum_of_neigbours, number_of_neighbours as f32, |a, b| a / b);
                 }
-                // SEPARATION RULE:
 
-                let acceleration = velocity_sum_of_neigbours;
+                // SEPARATION RULE:
+                let mut steer_away_velocity = Vector2{x: 0.0, y: 0.0};
+                for j in 0..self.birds.len() {
+                    let distance = Tools::distance(&self.birds[i], &self.birds[j]);
+                    if distance > 0.0 && distance <= MainState::SEPARATION_DISTANCE {
+                        let mut vector_away_from_neightbour = Tools::get_vec_from_to(self.birds[i].pos, self.birds[j].pos);
+                        Tools::normalize_vector(&mut vector_away_from_neightbour);
+                        Tools::vec_scalar_op(&mut vector_away_from_neightbour, distance, |a,b| a / b);
+                        Tools::vec_op(&mut steer_away_velocity, &vector_away_from_neightbour, |a,b| a + b);
+                        number_of_neighbours += 1;
+                    }
+                }
+                if number_of_neighbours > 0 {
+                    Tools::vec_scalar_op(&mut steer_away_velocity, number_of_neighbours as f32, |a,b| a / b);
+                }
+                if Tools::vector_length(&steer_away_velocity) > 0.0 {
+                    Tools::normalize_vector(&mut steer_away_velocity);
+                    Tools::vec_scalar_op(&mut steer_away_velocity, MainState::MAX_SPEED, |a,b| a * b);
+                    Tools::vec_op(&mut steer_away_velocity, &self.birds[i].vel, |a, b| a - b);
+                    Tools::limit_velocity(&mut steer_away_velocity, MainState::MAX_STEERING_VELOCITY);
+                }
+
+                // COHESION RULE:
+                let mut average_position = Point2{ x: 0.0, y: 0.0 };
+                let mut number_of_neighbours= 0;
+                for j in 0..self.birds.len() {
+                    let distance = Tools::distance(&self.birds[i], &self.birds[j]);
+                    if distance > 0.0 && distance <= MainState::ALIGNMENT_VIEW_DISTANCE {
+                        Tools::point_op(&mut average_position, &self.birds[j].pos, |a, b| a + b);
+                        number_of_neighbours += 1;
+                    }
+                }
+                if number_of_neighbours > 0 {
+                    Tools::point_scalar_op(&mut average_position, number_of_neighbours as f32, |a,b| a / b);
+                }
+                let mut steer_towards_velocity = Tools::get_vec_from_to(self.birds[i].pos, average_position);
+                Tools::normalize_vector(&mut steer_towards_velocity);
+                Tools::vec_scalar_op(&mut steer_towards_velocity, MainState::MAX_SPEED, |a, b| a * b);
+                Tools::vec_op(&mut steer_towards_velocity, &self.birds[i].vel, |a, b| a - b);
+                Tools::limit_velocity(&mut steer_towards_velocity, MainState::MAX_STEERING_VELOCITY);
+                
+                let mut acceleration = velocity_sum_of_neigbours;
+                Tools::vec_op(&mut acceleration, &steer_away_velocity, |a, b| a + b);
+                Tools::vec_op(&mut acceleration, &steer_towards_velocity, |a, b| a + b);
+                // println!("alignment: {:?}", velocity_sum_of_neigbours);
+                // println!("separation: {:?}", steer_away_velocity);
                 // set birds that are out of the screen as not alive
                 // if self.birds[i].pos.x < 0.0 || self.birds[i].pos.x >= self.screen_width || 
                 //    self.birds[i].pos.y < 0.0 || self.birds[i].pos.y >= self.screen_height{
                 //        self.birds[i].is_alive = false;
                 //    }
-                self.birds[i].update(acceleration, self.screen_width, self.screen_height);
+                self.birds[i].update(acceleration, MainState::MAX_SPEED, self.screen_width, self.screen_height);
             }
             // remove birds that are not alive
             self.birds.retain(|bird| bird.is_alive);
@@ -228,7 +266,7 @@ impl event::EventHandler for MainState {
         }
         if debug::is_active() {
             for bird in &mut self.birds {
-                debug::draw_debug_info(bird.view_distance_circle(ctx, MainState::VIEW_DISTANCE), bird.center_point(ctx), ctx).unwrap();
+                debug::draw_debug_info(bird.alignment_view_distance_circle(ctx, MainState::ALIGNMENT_VIEW_DISTANCE), bird.center_point(ctx), ctx).unwrap();
             }
         }
         // if debug::is_active() {
