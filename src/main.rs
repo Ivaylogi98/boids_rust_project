@@ -53,14 +53,14 @@ struct MainState {
 }
 
 impl MainState {
-    pub const ALIGNMENT_VIEW_DISTANCE: f32 = 80_f32;
-    pub const SEPARATION_VIEW_DISTANCE: f32 = 20_f32;
-    pub const COHESION_VIEW_DISTANCE: f32 = 80_f32;
-    pub const MAX_SPEED: f32 = 3_f32;
-    pub const MAX_STEERING_VELOCITY: f32 = 0.03_f32;
+    pub const ALIGNMENT_VIEW_DISTANCE: f32 = 100_f32;
+    pub const SEPARATION_VIEW_DISTANCE: f32 = 30_f32;
+    pub const COHESION_VIEW_DISTANCE: f32 = 100_f32;
+    pub const MAX_SPEED: f32 = 3.5_f32;
+    pub const MAX_STEERING_VELOCITY: f32 = 0.04_f32;
     pub const RANDOM_MOVEMENT: f32 = 0.05_f32;
 
-    pub const ALIGNMENT_MODIFIER: f32 = 1.5;
+    pub const ALIGNMENT_MODIFIER: f32 = 1.6;
     pub const SEPARATION_MODIFIER: f32 = 1.0;
     pub const COHESION_MODIFIER: f32 = 1.0;
 
@@ -170,17 +170,20 @@ impl event::EventHandler for MainState {
 
                     if number_of_neighbours > 0 {
                         velocity_sum_of_neigbours /= number_of_neighbours as f32;
-                        // Tools::normalize_vector(&mut velocity_sum_of_neigbours);
-                        // velocity_sum_of_neigbours *= MainState::MAX_SPEED;
-                        // velocity_sum_of_neigbours -= self.birds[i].vel;
-                        // Tools::limit_vector(&mut velocity_sum_of_neigbours, MainState::MAX_STEERING_VELOCITY);
+                        Tools::normalize_vector(&mut velocity_sum_of_neigbours);
+                        velocity_sum_of_neigbours *= MainState::MAX_SPEED;
+                        velocity_sum_of_neigbours -= self.birds[i].vel;
+                        Tools::limit_vector(&mut velocity_sum_of_neigbours, MainState::MAX_STEERING_VELOCITY);
                     }
                     else {
                         velocity_sum_of_neigbours = Vector2::new(0.0, 0.0);
 
                     }
                     if self.alignment_rule {
-                        acceleration += (velocity_sum_of_neigbours / 8.0) * MainState::ALIGNMENT_MODIFIER;
+                        velocity_sum_of_neigbours *= MainState::ALIGNMENT_MODIFIER;
+                    }
+                    else {
+                        velocity_sum_of_neigbours = Vector2::new(0.0, 0.0);
                     }
 
                     // ----------------------------------------SEPARATION RULE:-----------------------------------------------
@@ -203,13 +206,16 @@ impl event::EventHandler for MainState {
                     }
                     if Tools::vector_length(&steer_away_velocity) > 0.0 {
                         Tools::normalize_vector(&mut steer_away_velocity);
-                        // steer_away_velocity *= MainState::MAX_SPEED;
-                        // steer_away_velocity -= self.birds[i].vel;
-                        // Tools::limit_vector(&mut steer_away_velocity, MainState::MAX_STEERING_VELOCITY);
+                        steer_away_velocity *= MainState::MAX_SPEED;
+                        steer_away_velocity -= self.birds[i].vel;
+                        Tools::limit_vector(&mut steer_away_velocity, MainState::MAX_STEERING_VELOCITY);
                     }
 
                     if self.separation_rule {
-                        acceleration += steer_away_velocity * MainState::SEPARATION_MODIFIER;
+                        steer_away_velocity *= MainState::SEPARATION_MODIFIER;
+                    }
+                    else {
+                        steer_away_velocity = Vector2::new(0.0, 0.0);
                     }
 
                     // ------------------------------------------COHESION RULE:----------------------------------------------
@@ -229,7 +235,7 @@ impl event::EventHandler for MainState {
 
                     if number_of_neighbours > 0 {
                         average_position /= number_of_neighbours as f32;
-                        let mut vector_towards_average: Vector2<f32> = Tools::get_vec_from_to(self.birds[i].pos, average_position);
+                        let mut vector_towards_average: Vector2<f32> = Tools::get_vec_from_to(average_position, self.birds[i].pos);
                         Tools::normalize_vector(&mut vector_towards_average);
                         vector_towards_average *= MainState::MAX_SPEED;
 
@@ -238,7 +244,10 @@ impl event::EventHandler for MainState {
                     }
 
                     if self.cohesion_rule {
-                        acceleration += (steer_towards_velocity) * MainState::COHESION_MODIFIER;
+                        steer_towards_velocity *= MainState::COHESION_MODIFIER;
+                    }
+                    else {
+                        steer_towards_velocity = Vector2::new(0.0, 0.0);
                     }
 
                     // println!("alignment: {:?}", velocity_sum_of_neigbours);
@@ -257,8 +266,14 @@ impl event::EventHandler for MainState {
                     if self.random_movement_rule {
                         acceleration += random_movement;
                     }
-
-                    self.birds[i].update(acceleration , MainState::MAX_SPEED, self.screen_width, self.screen_height);
+                    // println!("{:?}\n{:?}\n{:?}\n", velocity_sum_of_neigbours, steer_away_velocity, steer_towards_velocity);
+                    self.birds[i].update(
+                        velocity_sum_of_neigbours,
+                        steer_away_velocity,  
+                        steer_towards_velocity,
+                        random_movement,
+                        MainState::MAX_SPEED,
+                        self.screen_width, self.screen_height);
                 }
                 // remove birds that are not alive
                 self.birds.retain(|bird| bird.is_alive);
@@ -300,8 +315,13 @@ impl event::EventHandler for MainState {
                     debug::draw_debug_info(
                         bird.alignment_view_distance_circle(ctx, MainState::ALIGNMENT_VIEW_DISTANCE),
                         bird.separation_view_distance_circle(ctx, MainState::SEPARATION_VIEW_DISTANCE),
-                        bird.center_point(ctx), ctx).
+                        bird.center_point(ctx),
+                        bird.alignment_vector(ctx),
+                        bird.separation_vector(ctx),
+                        bird.cohesion_vector(ctx),
+                        ctx).
                     unwrap();
+                    // println!("{:?}", bird);
                 }
             }
             graphics::present(ctx)?;
