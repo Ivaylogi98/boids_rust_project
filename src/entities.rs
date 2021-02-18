@@ -37,7 +37,7 @@ impl Bird{
         else {
             self.vel += acceleration;
         }
-        Tools::limit_velocity(&mut self.vel, max_velocity);
+        Tools::limit_vector(&mut self.vel, max_velocity);
 
         // update position
         self.pos.x += self.vel.x;
