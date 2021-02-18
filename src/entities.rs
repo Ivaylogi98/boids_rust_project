@@ -18,6 +18,7 @@ pub struct Bird {
     pub align: Vector2<f32>,
     pub sep: Vector2<f32>,
     pub coh: Vector2<f32>,
+    pub obst: Vector2<f32>,
     pub random: Vector2<f32>,
     pub is_alive: bool
 }
@@ -32,22 +33,22 @@ impl Bird{
             align: Vector2::new(0.0, 0.0),
             sep: Vector2::new(0.0, 0.0),
             coh: Vector2::new(0.0, 0.0),
+            obst: Vector2::new(0.0, 0.0),
             random: Vector2::new(0.0, 0.0),
             is_alive: true
         }
     }
 
-    pub fn update(&mut self, align: Vector2<f32>, sep: Vector2<f32>, coh: Vector2<f32>, random: Vector2<f32>, max_velocity: f32, screen_width: f32, screen_height: f32) {
-        
-        // println!("IN BIRD: {:?}", self);
+    pub fn update(&mut self, align: Vector2<f32>, sep: Vector2<f32>, coh: Vector2<f32>, random: Vector2<f32>, obst: Vector2<f32>, max_velocity: f32, screen_width: f32, screen_height: f32) {
         // update vectors in self
         self.align = align;
         self.sep = sep;
         self.coh = coh;
         self.random = random;
+        self.obst = obst;
 
         // update velocity
-        let acceleration: Vector2<f32> = align + sep + coh + random;
+        let acceleration: Vector2<f32> = align + sep + coh + random + obst;
         if acceleration.x == 0.0 && acceleration.y == 0.0 {
             self.vel *= Bird::SELF_ACCELERATION;
         }
@@ -136,21 +137,25 @@ impl Bird{
 #[derive(Debug)]
 pub struct Obstacle {
     pub pos: Point2<f32>,
-    pub radius: f32
+    pub radius: f32,
+    pub is_alive: bool
 }
 
 impl Obstacle{
 
     pub fn new(pos: Point2<f32>, radius: f32) -> Self {
         Obstacle{
-            pos,
-            radius
+            pos: pos,
+            radius: radius,
+            is_alive: true
         }
     }
     pub fn update(&mut self) {
         todo!()        
     }
-    pub fn draw(&mut self) {
-        todo!()
+    pub fn draw(&mut self, ctx: &mut Context, assets: &Assets) -> GameResult<()> {
+        let drawparams = graphics::DrawParam::new()
+                                .dest(self.pos);
+        graphics::draw(ctx, &assets.obstacle, drawparams)
     }
 }

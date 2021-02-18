@@ -33,6 +33,11 @@ enum Pause{
     ToPause,
     Paused
 }
+#[derive(Eq, PartialEq)]
+enum Entity{
+    Bird,
+    Obstacle
+}
 struct MainState {
     rng: ThreadRng,
     assets: Assets,
@@ -47,9 +52,10 @@ struct MainState {
     screen_height: f32,
     game_paused: bool,
     time_until_orient_update: f32,
-    bird_spawn_cooldown: f32,
+    spawn_cooldown: f32,
     pause: Pause,
-    debug: bool
+    debug: bool,
+    spawn_entity: Entity
 }
 
 impl MainState {
@@ -63,6 +69,7 @@ impl MainState {
     pub const ALIGNMENT_MODIFIER: f32 = 1.6;
     pub const SEPARATION_MODIFIER: f32 = 1.0;
     pub const COHESION_MODIFIER: f32 = 1.0;
+    pub const OBSTACLE_RADIUS: f32 = 30.0;
 
     fn new(ctx: &mut Context, conf: &Conf) -> GameResult<MainState> {
         let screen_width = conf.window_mode.width;
@@ -83,9 +90,10 @@ impl MainState {
             screen_height: conf.window_mode.height,
             game_paused: false,
             time_until_orient_update: 0.1 as f32,
-            bird_spawn_cooldown: 0.1 as f32,
+            spawn_cooldown: 0.1 as f32,
             pause: Pause::Running,
-            debug: false
+            debug: false,
+            spawn_entity: Entity::Bird
         };
 
         Ok(s)
@@ -123,6 +131,12 @@ impl MainState {
             Pause::Paused => self.pause = Pause::Running
         }
     }
+    fn toggle_spawn(&mut self) {
+        match self.spawn_entity {
+            Entity::Bird => self.spawn_entity = Entity::Obstacle,
+            Entity::Obstacle => self.spawn_entity = Entity::Bird
+        }
+    }
 }
 
 
@@ -134,23 +148,27 @@ impl event::EventHandler for MainState {
         while timer::check_update_time(ctx, DESIRED_FPS) {
             let seconds = 1.0 / (DESIRED_FPS as f32);
 
-
-            // for obstacle in self.obstacles.iter_mut() {
-            //     obstacle.update(seconds, self.rng);
-            // }
-
             if self.pause == Pause::Running {
-                self.bird_spawn_cooldown -= seconds;
+                self.spawn_cooldown -= seconds;
 
-                if mouse::button_pressed(ctx, mouse::MouseButton::Left) && self.bird_spawn_cooldown <= 0.0 {
+                if mouse::button_pressed(ctx, mouse::MouseButton::Left) && self.spawn_cooldown <= 0.0 {
                     let mouse_position = mouse::position(ctx);
 
                     let x = mouse_position.x;
                     let y = mouse_position.y;
 
-                    let new_bird = Bird::new(Point2::new(x*0.99, y*0.96), Vector2::new(self.rng.gen_range(-0.1 .. 0.1), self.rng.gen_range(-0.1 .. 0.1)) );
-                    self.birds.push(new_bird);
-                    self.bird_spawn_cooldown = 0.1;
+                    match self.spawn_entity {
+                        Entity::Bird => {
+                            let new_bird = Bird::new(Point2::new(x*0.99, y*0.96), Vector2::new(self.rng.gen_range(-0.1 .. 0.1), self.rng.gen_range(-0.1 .. 0.1)) );
+                            self.birds.push(new_bird);
+                            self.spawn_cooldown = 0.1;
+                        },
+                        Entity::Obstacle => {
+                            let new_obstacle = Obstacle::new(Point2::new(x*0.99, y*0.96), MainState::OBSTACLE_RADIUS);
+                            self.obstacles.push(new_obstacle);
+                            self.spawn_cooldown = 0.1;
+                        }
+                    }
                 }
                 for i in 0..self.birds.len() {
 
@@ -188,6 +206,7 @@ impl event::EventHandler for MainState {
 
                     // ----------------------------------------SEPARATION RULE:-----------------------------------------------
                     let mut steer_away_velocity: Vector2<f32> = Vector2::new(0.0, 0.0);
+                    let mut number_of_neighbours = 0;
 
                     for j in 0..self.birds.len() {
                         let distance: f32 = distance(&self.birds[i].pos, &self.birds[j].pos);
@@ -259,6 +278,7 @@ impl event::EventHandler for MainState {
                     //    }
                     // println!("{}:\nAlignment: {:?}\nSeparation: {:?}\nCohesion: {:?}", i, velocity_sum_of_neigbours, steer_away_velocity, steer_towards_velocity);
 
+                    // ------------------------------------------OBSTACLE EVASION:----------------------------------------------
                     let random_movement: Vector2<f32> = Vector2::new(
                         self.rng.gen_range(-MainState::RANDOM_MOVEMENT .. MainState::RANDOM_MOVEMENT), 
                         self.rng.gen_range(-MainState::RANDOM_MOVEMENT .. MainState::RANDOM_MOVEMENT)
@@ -266,17 +286,40 @@ impl event::EventHandler for MainState {
                     if self.random_movement_rule {
                         acceleration += random_movement;
                     }
+                    let mut obstacle_evasion: Vector2<f32> = Vector2::new(0.0, 0.0);
+                    for obstacle in self.obstacles.iter() {
+                        let distance: f32 = distance(&self.birds[i].pos, &obstacle.pos);
+                        if distance <= obstacle.radius {
+                            let mut vector_away_from_obstacle: Vector2<f32> = self.birds[i].pos - obstacle.pos;
+                            Tools::normalize_vector(&mut vector_away_from_obstacle);
+                            vector_away_from_obstacle /= distance;
+                            obstacle_evasion += vector_away_from_obstacle;
+                            number_of_neighbours += 1;
+                        }
+                    }
+                    if number_of_neighbours > 0 {
+                        steer_away_velocity /= number_of_neighbours as f32;
+                    }
+                    if Tools::vector_length(&steer_away_velocity) > 0.0 {
+                        Tools::normalize_vector(&mut steer_away_velocity);
+                        steer_away_velocity *= MainState::MAX_SPEED;
+                        steer_away_velocity -= self.birds[i].vel;
+                        Tools::limit_vector(&mut steer_away_velocity, MainState::MAX_STEERING_VELOCITY);
+                    }
+
                     // println!("{:?}\n{:?}\n{:?}\n", velocity_sum_of_neigbours, steer_away_velocity, steer_towards_velocity);
                     self.birds[i].update(
                         velocity_sum_of_neigbours,
                         steer_away_velocity,  
                         steer_towards_velocity,
                         random_movement,
+                        obstacle_evasion,
                         MainState::MAX_SPEED,
                         self.screen_width, self.screen_height);
                 }
                 // remove birds that are not alive
                 self.birds.retain(|bird| bird.is_alive);
+                self.obstacles.retain(|obstacle| obstacle.is_alive);
                     
             }   
 
@@ -292,13 +335,14 @@ impl event::EventHandler for MainState {
             event::KeyCode::C => self.toggle_rule("cohesion"),
             event::KeyCode::R => self.toggle_rule("random"),
             event::KeyCode::D => self.toggle_rule("debug"),
+            event::KeyCode::P => self.toggle_pause(),
+            event::KeyCode::Escape => event::quit(ctx),
+            event::KeyCode::Space => self.toggle_spawn(),
             event::KeyCode::K => {
                 for bird in self.birds.iter_mut() {
                     bird.is_alive = false;
                 }
             },
-            event::KeyCode::P => self.toggle_pause(),
-            event::KeyCode::Escape => event::quit(ctx),
             _ => (), // Do nothing
         }
     }
