@@ -53,9 +53,9 @@ struct MainState {
 }
 
 impl MainState {
-    pub const ALIGNMENT_VIEW_DISTANCE: f32 = 50_f32;
-    pub const SEPARATION_VIEW_DISTANCE: f32 = 25_f32;
-    pub const COHESION_VIEW_DISTANCE: f32 = 50_f32;
+    pub const ALIGNMENT_VIEW_DISTANCE: f32 = 80_f32;
+    pub const SEPARATION_VIEW_DISTANCE: f32 = 20_f32;
+    pub const COHESION_VIEW_DISTANCE: f32 = 80_f32;
     pub const MAX_SPEED: f32 = 3_f32;
     pub const MAX_STEERING_VELOCITY: f32 = 0.03_f32;
     pub const RANDOM_MOVEMENT: f32 = 0.05_f32;
@@ -90,16 +90,6 @@ impl MainState {
 
         Ok(s)
     }
-
-    // fn handle_collisions(&mut self, ctx: &mut Context) {
-    //     for obstacle in &mut self.obstacles {
-    //         for bird in &mut self.birds {
-    //             if obstacle.bounding_rect(ctx).contains(bird.pos) {
-    //                 todo!();
-    //             }
-    //         }
-    //     }
-    // }
 
     fn toggle_rule(&mut self, rule: &str) {
         match rule {
@@ -138,9 +128,6 @@ impl MainState {
 
 impl event::EventHandler for MainState {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
-        // if self.game_over {
-        //     return Ok(());
-        // }
 
         const DESIRED_FPS: u32 = 60;
 
@@ -151,6 +138,7 @@ impl event::EventHandler for MainState {
             // for obstacle in self.obstacles.iter_mut() {
             //     obstacle.update(seconds, self.rng);
             // }
+
             if self.pause == Pause::Running {
                 self.bird_spawn_cooldown -= seconds;
 
@@ -160,7 +148,7 @@ impl event::EventHandler for MainState {
                     let x = mouse_position.x;
                     let y = mouse_position.y;
 
-                    let new_bird = Bird::new(Point2::new(x, y), Vector2::new(self.rng.gen_range(-0.1 .. 0.1), self.rng.gen_range(-0.1 .. 0.1)) );
+                    let new_bird = Bird::new(Point2::new(x*0.99, y*0.96), Vector2::new(self.rng.gen_range(-0.1 .. 0.1), self.rng.gen_range(-0.1 .. 0.1)) );
                     self.birds.push(new_bird);
                     self.bird_spawn_cooldown = 0.1;
                 }
@@ -182,10 +170,10 @@ impl event::EventHandler for MainState {
 
                     if number_of_neighbours > 0 {
                         velocity_sum_of_neigbours /= number_of_neighbours as f32;
-                        Tools::normalize_vector(&mut velocity_sum_of_neigbours);
-                        velocity_sum_of_neigbours *= MainState::MAX_SPEED;
-                        velocity_sum_of_neigbours -= self.birds[i].vel;
-                        Tools::limit_vector(&mut velocity_sum_of_neigbours, MainState::MAX_STEERING_VELOCITY);
+                        // Tools::normalize_vector(&mut velocity_sum_of_neigbours);
+                        // velocity_sum_of_neigbours *= MainState::MAX_SPEED;
+                        // velocity_sum_of_neigbours -= self.birds[i].vel;
+                        // Tools::limit_vector(&mut velocity_sum_of_neigbours, MainState::MAX_STEERING_VELOCITY);
                     }
                     else {
                         velocity_sum_of_neigbours = Vector2::new(0.0, 0.0);
@@ -204,7 +192,7 @@ impl event::EventHandler for MainState {
                         if distance > 0.0 && distance <= MainState::SEPARATION_VIEW_DISTANCE {
                             let mut vector_away_from_neightbour: Vector2<f32> = self.birds[i].pos - self.birds[j].pos;
                             Tools::normalize_vector(&mut vector_away_from_neightbour);
-                            // vector_away_from_neightbour /= distance;
+                            vector_away_from_neightbour /= distance;
                             steer_away_velocity += vector_away_from_neightbour;
                             number_of_neighbours += 1;
                         }
@@ -215,9 +203,9 @@ impl event::EventHandler for MainState {
                     }
                     if Tools::vector_length(&steer_away_velocity) > 0.0 {
                         Tools::normalize_vector(&mut steer_away_velocity);
-                        steer_away_velocity *= MainState::MAX_SPEED;
-                        steer_away_velocity -= self.birds[i].vel;
-                        Tools::limit_vector(&mut steer_away_velocity, MainState::MAX_STEERING_VELOCITY);
+                        // steer_away_velocity *= MainState::MAX_SPEED;
+                        // steer_away_velocity -= self.birds[i].vel;
+                        // Tools::limit_vector(&mut steer_away_velocity, MainState::MAX_STEERING_VELOCITY);
                     }
 
                     if self.separation_rule {
@@ -238,12 +226,14 @@ impl event::EventHandler for MainState {
                     }
 
                     let mut steer_towards_velocity: Vector2<f32> = Vector2::new(0.0, 0.0);
+
                     if number_of_neighbours > 0 {
                         average_position /= number_of_neighbours as f32;
-                        steer_towards_velocity = self.birds[i].pos - average_position;
-                        Tools::normalize_vector(&mut steer_towards_velocity);
-                        steer_towards_velocity *= MainState::MAX_SPEED;
-                        steer_towards_velocity -= self.birds[i].vel;
+                        let mut vector_towards_average: Vector2<f32> = Tools::get_vec_from_to(self.birds[i].pos, average_position);
+                        Tools::normalize_vector(&mut vector_towards_average);
+                        vector_towards_average *= MainState::MAX_SPEED;
+
+                        steer_towards_velocity = vector_towards_average - self.birds[i].vel;
                         Tools::limit_vector(&mut steer_towards_velocity, MainState::MAX_STEERING_VELOCITY);
                     }
 
