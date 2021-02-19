@@ -1,7 +1,5 @@
-use ggez::audio;
 use ggez::graphics;
 use ggez::{Context, GameResult};
-use std::fmt::Debug;
 
 pub struct Assets {
     pub bird: graphics::Image,

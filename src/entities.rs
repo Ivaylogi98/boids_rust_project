@@ -1,11 +1,7 @@
-use core::time;
-
 use ggez::{Context, GameResult};
 use ggez::graphics;
 use ggez::graphics::{Mesh, MeshBuilder, DrawMode};
 use ggez::nalgebra::{Point2, Vector2};
-use rand::Rng;
-use rand::rngs::ThreadRng;
 
 use crate::assets::Assets;
 use crate::tools::Tools;
@@ -24,7 +20,7 @@ pub struct Bird {
 }
 
 impl Bird{
-    pub const SELF_ACCELERATION: f32 = 1.0;
+    pub const SELF_ACCELERATION: f32 = 1.05;
 
     pub fn new(pos: Point2<f32>, vel: Vector2<f32>) -> Self {
         Bird{
@@ -51,10 +47,11 @@ impl Bird{
         let acceleration: Vector2<f32> = align + sep + coh + random + obst;
         if acceleration.x == 0.0 && acceleration.y == 0.0 {
             self.vel *= Bird::SELF_ACCELERATION;
+            Tools::limit_vector(&mut self.vel, max_velocity);
         }
         else {
-            Tools::limit_vector(&mut self.vel, max_velocity);
             self.vel += acceleration;
+            Tools::limit_vector(&mut self.vel, max_velocity);
         }
 
         // update position

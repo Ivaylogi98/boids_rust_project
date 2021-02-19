@@ -282,7 +282,7 @@ impl event::EventHandler for MainState {
                     if Tools::vector_length(&obstacle_evasion) > 0.0 {
                         Tools::normalize_vector(&mut obstacle_evasion);
                         obstacle_evasion *= MainState::MAX_SPEED;
-                        obstacle_evasion += self.birds[i].vel;
+                        obstacle_evasion -= self.birds[i].vel;
                         Tools::limit_vector(&mut obstacle_evasion, MainState::MAX_STEERING_VELOCITY);
                     }
                     obstacle_evasion *= MainState::OBSTACLE_MODIFIER;
@@ -302,9 +302,7 @@ impl event::EventHandler for MainState {
                 self.obstacles.retain(|obstacle| obstacle.is_alive);
                     
             }   
-
         }
-
         Ok(())
     }
 
@@ -374,56 +372,65 @@ impl event::EventHandler for MainState {
 
             // draw UI
             // draw alignment rule text
-            let mut drawparams = graphics::DrawParam::new()
-                                    .dest(Point2::new(0.0, self.screen_height / 2.0))
-                                    .scale(Vector2::new(1.0, 1.0))
-                                    .offset(Point2::new(0.0, 0.0));
-            if self.alignment_rule {
-                drawparams = drawparams.color((0, 255, 0).into());
+            let drawparams = graphics::DrawParam::new().scale(Vector2::new(1.0, 1.0)).offset(Point2::new(0.0, 0.0));
+
+            let new_drawarams = if self.alignment_rule {
+                drawparams.color((0, 255, 0).into())
             }
             else {
-                drawparams = drawparams.color((255, 0, 0).into());
-            }
-            graphics::draw(ctx, &graphics::Text::new("alignment"), drawparams)?;
+                drawparams.color((255, 0, 0).into())
+            }.dest(Point2::new(0.0, self.screen_height / 2.0));
+
+            graphics::draw(ctx, &graphics::Text::new("alignment"), new_drawarams)?;
 
             // draw separation rule text
-            let mut drawparams = graphics::DrawParam::new()
-                                    .dest(Point2::new(0.0, self.screen_height / 2.0 + 20.0))
-                                    .scale(Vector2::new(1.0, 1.0))
-                                    .offset(Point2::new(0.0, 0.0));
-            if self.separation_rule {
-                drawparams = drawparams.color((0, 255, 0).into());
+            let new_drawarams = if self.separation_rule {
+                drawparams.color((0, 255, 0).into())
             }
             else {
-                drawparams = drawparams.color((255, 0, 0).into());
-            }
-            graphics::draw(ctx, &graphics::Text::new("separation"), drawparams)?;
+                drawparams.color((255, 0, 0).into())
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 20.0));
+
+            graphics::draw(ctx, &graphics::Text::new("separation"), new_drawarams)?;
 
             // draw cohesion rule text
-            let mut drawparams = graphics::DrawParam::new()
-                                    .dest(Point2::new(0.0, self.screen_height / 2.0 + 40.0))
-                                    .scale(Vector2::new(1.0, 1.0))
-                                    .offset(Point2::new(0.0, 0.0));
-            if self.cohesion_rule {
-                drawparams = drawparams.color((0, 255, 0).into());
+            let new_drawarams = if self.cohesion_rule {
+                drawparams.color((0, 255, 0).into())
             }
             else {
-                drawparams = drawparams.color((255, 0, 0).into());
-            }
-            graphics::draw(ctx, &graphics::Text::new("cohesion"), drawparams)?;
+                drawparams.color((255, 0, 0).into())
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 40.0));
+
+            graphics::draw(ctx, &graphics::Text::new("cohesion"), new_drawarams)?;
 
             // draw random movement text
-            let mut drawparams = graphics::DrawParam::new()
-                                    .dest(Point2::new(0.0, self.screen_height / 2.0 + 60.0))
-                                    .scale(Vector2::new(1.0, 1.0))
-                                    .offset(Point2::new(0.0, 0.0));
-            if self.random_movement_rule {
-                drawparams = drawparams.color((0, 255, 0).into());
+            let new_drawarams = if self.random_movement_rule {
+                drawparams.color((0, 255, 0).into())
             }
             else {
-                drawparams = drawparams.color((255, 0, 0).into());
+                drawparams.color((255, 0, 0).into())
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 60.0));
+
+            graphics::draw(ctx, &graphics::Text::new("random movement"), new_drawarams)?;
+            
+            // draw birds count text
+            let new_drawarams = if self.birds.len() > 0 {
+                drawparams.color((0, 255, 0).into())
             }
-            graphics::draw(ctx, &graphics::Text::new("random movement"), drawparams)?;
+            else {
+                drawparams.color((255, 0, 0).into())
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 90.0));
+            graphics::draw(ctx, &graphics::Text::new(format!("Birds:{}", self.birds.len())), new_drawarams)?;
+
+            // draw obstacles count text
+            let new_drawarams = if self.obstacles.len() > 0 {
+                drawparams.color((0, 255, 0).into())
+            }
+            else {
+                drawparams.color((255, 0, 0).into())
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 110.0));
+
+            graphics::draw(ctx, &graphics::Text::new(format!("Obstacles:{}", self.obstacles.len())), new_drawarams)?;
             
 
             graphics::present(ctx)?;
@@ -436,11 +443,11 @@ impl event::EventHandler for MainState {
                 (0, 0, 0, 60).into()).build(ctx).unwrap();
 
             graphics::draw(ctx, &pause_screen, graphics::DrawParam::default())?;
-
+            
+            // draw menu on pause screen
             let drawparams = graphics::DrawParam::new()
                                     .dest(Point2::new(self.screen_width / 2.0 - 200.0, self.screen_height / 2.0 - 60.0))
-                                    .scale(Vector2::new(1.2, 1.2))
-                                    .offset(Point2::new(0.0, 0.0));
+                                    .scale(Vector2::new(1.2, 1.2));
             let pause_menu_legend = r"Press:
     ESC to exit
     SPACE to toggle entity spawning (bird / obstacle)

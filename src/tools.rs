@@ -1,6 +1,4 @@
 use ggez::nalgebra::{ Vector2, Point2 };
-use crate::entities::Bird;
-
 
 pub struct Tools { }
 impl Tools{ 
