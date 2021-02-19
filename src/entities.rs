@@ -48,13 +48,15 @@ impl Bird{
         self.obst = obst;
 
         // update velocity
-        let acceleration: Vector2<f32> = align + sep + coh + random + obst;
+        let acceleration: Vector2<f32> = align + sep + coh + random;
         if acceleration.x == 0.0 && acceleration.y == 0.0 {
             self.vel *= Bird::SELF_ACCELERATION;
         }
         else {
             self.vel += acceleration;
         }
+        Tools::limit_vector(&mut self.vel, max_velocity);
+        self.vel += obst;
         Tools::limit_vector(&mut self.vel, max_velocity);
 
         // update position
@@ -154,8 +156,10 @@ impl Obstacle{
         todo!()        
     }
     pub fn draw(&mut self, ctx: &mut Context, assets: &Assets) -> GameResult<()> {
-        let drawparams = graphics::DrawParam::new()
-                                .dest(self.pos);
+        let drawparams = graphics::DrawParam::new().
+                                    scale(Vector2::new(0.1, 0.1)).
+                                    offset(Point2::new(0.5, 0.5)).
+                                    dest(self.pos);
         graphics::draw(ctx, &assets.obstacle, drawparams)
     }
 }
