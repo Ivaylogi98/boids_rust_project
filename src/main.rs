@@ -32,7 +32,6 @@ enum Pause{
     ToPause,
     Paused
 }
-#[derive(Eq, PartialEq)]
 enum Entity{
     Bird,
     Obstacle
@@ -50,7 +49,8 @@ struct MainState {
     screen_height: f32,
     spawn_cooldown: f32,
     pause: Pause,
-    debug: bool,
+    debug_circles: bool,
+    debug_vectors: bool,
     spawn_entity: Entity
 }
 
@@ -58,14 +58,16 @@ impl MainState {
     pub const ALIGNMENT_VIEW_DISTANCE: f32 = 100_f32;
     pub const SEPARATION_VIEW_DISTANCE: f32 = 30_f32;
     pub const COHESION_VIEW_DISTANCE: f32 = 100_f32;
+    pub const OBSTACLE_RADIUS: f32 = 50.0;
+
     pub const MAX_SPEED: f32 = 3.5_f32;
-    pub const MAX_STEERING_VELOCITY: f32 = 0.09_f32;
-    pub const RANDOM_MOVEMENT: f32 = 0.05_f32;
+    pub const MAX_STEERING_VELOCITY: f32 = 0.16_f32;
+    pub const RANDOM_MOVEMENT: f32 = 0.1_f32;
 
     pub const ALIGNMENT_MODIFIER: f32 = 1.6;
-    pub const SEPARATION_MODIFIER: f32 = 1.0;
-    pub const COHESION_MODIFIER: f32 = 0.6;
-    pub const OBSTACLE_RADIUS: f32 = 30.0;
+    pub const SEPARATION_MODIFIER: f32 = 2.0;
+    pub const COHESION_MODIFIER: f32 = 1.0;
+    pub const OBSTACLE_MODIFIER: f32 = 2.5;
 
     fn new(ctx: &mut Context, conf: &Conf) -> GameResult<MainState> {
         let screen_width = conf.window_mode.width;
@@ -83,9 +85,10 @@ impl MainState {
             random_movement_rule: true,
             screen_width: conf.window_mode.width,
             screen_height: conf.window_mode.height,
-            spawn_cooldown: 0.1 as f32,
+            spawn_cooldown: 0.05 as f32,
             pause: Pause::Running,
-            debug: false,
+            debug_circles: false,
+            debug_vectors: false,
             spawn_entity: Entity::Bird
         };
 
@@ -110,9 +113,13 @@ impl MainState {
                 self.random_movement_rule = !self.random_movement_rule;
                 println!("Random movement rule is {}", self.random_movement_rule);
             },
-            "debug" => {
-                self.debug = !self.debug;
-                println!("Debug is {}", self.debug);
+            "debug_circles" => {
+                self.debug_circles = !self.debug_circles;
+                println!("Debug circles is {}", self.debug_circles);
+            },
+            "debug_vectors" => {
+                self.debug_vectors = !self.debug_vectors;
+                println!("Debug vectors is {}", self.debug_vectors);
             },
             _ => ()
         }
@@ -154,12 +161,12 @@ impl event::EventHandler for MainState {
                         Entity::Bird => {
                             let new_bird = Bird::new(Point2::new(x*0.99, y*0.96), Vector2::new(self.rng.gen_range(-0.1 .. 0.1), self.rng.gen_range(-0.1 .. 0.1)) );
                             self.birds.push(new_bird);
-                            self.spawn_cooldown = 0.1;
+                            self.spawn_cooldown = 0.05;
                         },
                         Entity::Obstacle => {
                             let new_obstacle = Obstacle::new(Point2::new(x*0.99, y*0.96), MainState::OBSTACLE_RADIUS);
                             self.obstacles.push(new_obstacle);
-                            self.spawn_cooldown = 0.1;
+                            self.spawn_cooldown = 0.05;
                         }
                     }
                 }
@@ -261,7 +268,7 @@ impl event::EventHandler for MainState {
                     let mut obstacle_evasion: Vector2<f32> = Vector2::new(0.0, 0.0);
                     for obstacle in self.obstacles.iter() {
                         let distance: f32 = distance(&self.birds[i].pos, &obstacle.pos);
-                        if distance <= obstacle.radius {
+                        if distance <= MainState::OBSTACLE_RADIUS {
                             let mut vector_away_from_obstacle: Vector2<f32> = self.birds[i].pos - obstacle.pos;
                             Tools::normalize_vector(&mut vector_away_from_obstacle);
                             vector_away_from_obstacle /= distance;
@@ -275,11 +282,12 @@ impl event::EventHandler for MainState {
                     if Tools::vector_length(&obstacle_evasion) > 0.0 {
                         Tools::normalize_vector(&mut obstacle_evasion);
                         obstacle_evasion *= MainState::MAX_SPEED;
-                        obstacle_evasion -= self.birds[i].vel;
+                        obstacle_evasion += self.birds[i].vel;
                         Tools::limit_vector(&mut obstacle_evasion, MainState::MAX_STEERING_VELOCITY);
                     }
+                    obstacle_evasion *= MainState::OBSTACLE_MODIFIER;
+                    // ---------------------------------------------------------------------------------------------------------
                     
-
                     self.birds[i].update(
                         velocity_sum_of_neigbours,
                         steer_away_velocity,  
@@ -306,7 +314,8 @@ impl event::EventHandler for MainState {
             event::KeyCode::A => self.toggle_rule("alignment"),
             event::KeyCode::C => self.toggle_rule("cohesion"),
             event::KeyCode::R => self.toggle_rule("random"),
-            event::KeyCode::D => self.toggle_rule("debug"),
+            event::KeyCode::D => self.toggle_rule("debug_circles"),
+            event::KeyCode::V => self.toggle_rule("debug_vectors"),
             event::KeyCode::P => self.toggle_pause(),
             event::KeyCode::Space => self.toggle_spawn(),
             event::KeyCode::Escape => event::quit(ctx),
@@ -340,17 +349,25 @@ impl event::EventHandler for MainState {
                 obstacle.draw(ctx, &self.assets)?;
             }
 
-            if self.debug == true || debug::is_active() {
+            if self.debug_circles || self.debug_vectors || debug::is_active() {
                 for bird in &mut self.birds {
-                    debug::draw_debug_info(
-                        bird.alignment_view_distance_circle(ctx, MainState::ALIGNMENT_VIEW_DISTANCE),
-                        bird.separation_view_distance_circle(ctx, MainState::SEPARATION_VIEW_DISTANCE),
-                        bird.center_point(ctx),
-                        bird.alignment_vector(ctx),
-                        bird.separation_vector(ctx),
-                        bird.cohesion_vector(ctx),
-                        ctx).
-                    unwrap();
+                    if self.debug_circles{
+                        debug::draw_debug_circles(
+                            bird.alignment_view_distance_circle(ctx, MainState::ALIGNMENT_VIEW_DISTANCE),
+                            bird.separation_view_distance_circle(ctx, MainState::SEPARATION_VIEW_DISTANCE),
+                            bird.center_point(ctx),
+                            ctx).
+                        unwrap();
+                    }
+                    if self.debug_vectors {
+                        debug::draw_debug_vectors(
+                            bird.alignment_vector(ctx),
+                            bird.separation_vector(ctx),
+                            bird.cohesion_vector(ctx),
+                            bird.obstacle_vector(ctx),
+                            ctx).
+                        unwrap();
+                    }
                     // println!("{:?}", bird);
                 }
             }
@@ -421,11 +438,18 @@ impl event::EventHandler for MainState {
             graphics::draw(ctx, &pause_screen, graphics::DrawParam::default())?;
 
             let drawparams = graphics::DrawParam::new()
-                                    .dest(Point2::new(self.screen_width / 2.0 - 200.0, self.screen_height / 2.0 - 50.0))
+                                    .dest(Point2::new(self.screen_width / 2.0 - 200.0, self.screen_height / 2.0 - 60.0))
                                     .scale(Vector2::new(1.2, 1.2))
                                     .offset(Point2::new(0.0, 0.0));
-
-            graphics::draw(ctx, &graphics::Text::new("Press:\nSPACE to toggle entity spawning(bird or obstacle)\nO to remove obstacles\nB to remove birds\nD to enter debug mode\nP to pause and unpause"), drawparams)?;
+            let pause_menu_legend = r"Press:
+    ESC to exit
+    SPACE to toggle entity spawning (bird / obstacle)
+    O to remove obstacles
+    B to remove birds
+    P to pause and unpause
+    D to show view distances
+    V to show vectors";
+            graphics::draw(ctx, &graphics::Text::new(pause_menu_legend), drawparams)?;
 
             graphics::present(ctx)?;
         }

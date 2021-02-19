@@ -48,16 +48,14 @@ impl Bird{
         self.obst = obst;
 
         // update velocity
-        let acceleration: Vector2<f32> = align + sep + coh + random;
+        let acceleration: Vector2<f32> = align + sep + coh + random + obst;
         if acceleration.x == 0.0 && acceleration.y == 0.0 {
             self.vel *= Bird::SELF_ACCELERATION;
         }
         else {
+            Tools::limit_vector(&mut self.vel, max_velocity);
             self.vel += acceleration;
         }
-        Tools::limit_vector(&mut self.vel, max_velocity);
-        self.vel += obst;
-        Tools::limit_vector(&mut self.vel, max_velocity);
 
         // update position
         self.pos.x += self.vel.x;
@@ -115,7 +113,7 @@ impl Bird{
             Mesh::new_circle(ctx, DrawMode::fill(), self.pos, 1.0, 1.0, (255, 0, 0).into()).unwrap()
         }
         else {
-            Mesh::new_line(ctx, &[self.pos, Point2::new(self.pos.x + self.align.x * 1000.0, self.pos.y + self.align.y * 1000.0)], 1.0, (255, 0, 0).into()).unwrap()
+            Mesh::new_line(ctx, &[self.pos, Point2::new(self.pos.x + self.align.x * 100.0, self.pos.y + self.align.y * 100.0)], 1.0, (255, 0, 0).into()).unwrap()
         }
     }
     pub fn separation_vector(&self, ctx: &mut Context) -> graphics::Mesh {
@@ -123,7 +121,7 @@ impl Bird{
             Mesh::new_circle(ctx, DrawMode::fill(), self.pos, 1.0, 1.0, (255, 0, 0).into()).unwrap()
         }
         else {
-            Mesh::new_line(ctx, &[self.pos, Point2::new(self.pos.x + self.sep.x * 1000.0, self.pos.y + self.sep.y * 1000.0)], 1.0, (0, 255, 0).into()).unwrap()
+            Mesh::new_line(ctx, &[self.pos, Point2::new(self.pos.x + self.sep.x * 100.0, self.pos.y + self.sep.y * 100.0)], 1.0, (0, 255, 0).into()).unwrap()
         }
     }
     pub fn cohesion_vector(&self, ctx: &mut Context) -> graphics::Mesh {
@@ -131,7 +129,15 @@ impl Bird{
             Mesh::new_circle(ctx, DrawMode::fill(), self.pos, 1.0, 1.0, (255, 0, 0).into()).unwrap()
         }
         else {
-            Mesh::new_line(ctx, &[self.pos, Point2::new(self.pos.x + self.coh.x * 1000.0, self.pos.y + self.coh.y * 1000.0)], 1.0, (0, 0, 255).into()).unwrap()
+            Mesh::new_line(ctx, &[self.pos, Point2::new(self.pos.x + self.coh.x * 100.0, self.pos.y + self.coh.y * 100.0)], 1.0, (0, 0, 255).into()).unwrap()
+        }
+    }
+    pub fn obstacle_vector(&self, ctx: &mut Context) -> graphics::Mesh {
+        if self.obst.x == 0.0 && self.obst.y == 0.0 {
+            Mesh::new_circle(ctx, DrawMode::fill(), self.pos, 1.0, 1.0, (255, 225, 0).into()).unwrap()
+        }
+        else {
+            Mesh::new_line(ctx, &[self.pos, Point2::new(self.pos.x + self.obst.x * 100.0, self.pos.y + self.obst.y * 100.0)], 1.0, (255, 225, 0).into()).unwrap()
         }
     }
 }
