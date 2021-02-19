@@ -379,7 +379,7 @@ impl event::EventHandler for MainState {
             }
             else {
                 drawparams.color((255, 0, 0).into())
-            }.dest(Point2::new(0.0, self.screen_height / 2.0));
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 - 40.0));
 
             graphics::draw(ctx, &graphics::Text::new("alignment"), new_drawarams)?;
 
@@ -389,7 +389,7 @@ impl event::EventHandler for MainState {
             }
             else {
                 drawparams.color((255, 0, 0).into())
-            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 20.0));
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 - 20.0));
 
             graphics::draw(ctx, &graphics::Text::new("separation"), new_drawarams)?;
 
@@ -399,7 +399,7 @@ impl event::EventHandler for MainState {
             }
             else {
                 drawparams.color((255, 0, 0).into())
-            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 40.0));
+            }.dest(Point2::new(0.0, self.screen_height / 2.0));
 
             graphics::draw(ctx, &graphics::Text::new("cohesion"), new_drawarams)?;
 
@@ -409,7 +409,7 @@ impl event::EventHandler for MainState {
             }
             else {
                 drawparams.color((255, 0, 0).into())
-            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 60.0));
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 20.0));
 
             graphics::draw(ctx, &graphics::Text::new("random movement"), new_drawarams)?;
             
@@ -419,7 +419,7 @@ impl event::EventHandler for MainState {
             }
             else {
                 drawparams.color((255, 0, 0).into())
-            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 90.0));
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 50.0));
             graphics::draw(ctx, &graphics::Text::new(format!("Birds:{}", self.birds.len())), new_drawarams)?;
 
             // draw obstacles count text
@@ -428,7 +428,7 @@ impl event::EventHandler for MainState {
             }
             else {
                 drawparams.color((255, 0, 0).into())
-            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 110.0));
+            }.dest(Point2::new(0.0, self.screen_height / 2.0 + 70.0));
 
             graphics::draw(ctx, &graphics::Text::new(format!("Obstacles:{}", self.obstacles.len())), new_drawarams)?;
             
@@ -446,7 +446,7 @@ impl event::EventHandler for MainState {
             
             // draw menu on pause screen
             let drawparams = graphics::DrawParam::new()
-                                    .dest(Point2::new(self.screen_width / 2.0 - 200.0, self.screen_height / 2.0 - 60.0))
+                                    .dest(Point2::new(self.screen_width / 2.0 - 200.0, self.screen_height / 2.0 - 90.0))
                                     .scale(Vector2::new(1.2, 1.2));
             let pause_menu_legend = r"Press:
     ESC to exit
@@ -455,7 +455,10 @@ impl event::EventHandler for MainState {
     B to remove birds
     P to pause and unpause
     D to show view distances
-    V to show vectors";
+    V to show vectors
+    A to toggle Alignment rule
+    S to toggle Separation rule
+    C to toggle Cohesion rule";
             graphics::draw(ctx, &graphics::Text::new(pause_menu_legend), drawparams)?;
 
             graphics::present(ctx)?;
